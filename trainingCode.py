@@ -12,6 +12,9 @@ import json
 from pydub import AudioSegment
 import random
 import scipy
+from SpectrogramTest import getSpectrogram
+
+
 
 def getBPM(directory, fileName, finalName, audioFile):
     try:
@@ -97,31 +100,7 @@ while True:
         for y in range(0, x.length()):
             #Grab data from the dataset - this is REAL data, not generated data
             data = x.datas[y]
-            #Read the wavfile
-            sr, songData = wavfile.read(data.wavFile)
-            songData = np.mean(songData, axis=1)
-            #Make the spectrogram - 1000 is the best resolution I found that gives a reasonable balance of accuracy
-            _, times, sxx = scipy.signal.spectrogram(songData, sr, nperseg=1000)
-            #Figure out the time step per position (that's times[1] minus times[0]), divide the seconds by it to get the position, then ceiling by flooring it then adding 1
-            posInSxx = (int(data.secondsIn//(times[1]-times[0]))+1)
-            #This is an extra bit that'll be set because there's a chance that my position is super near the start or end
-            emptyBit = None
-            #I grouped the bits for being past the start and past the end - it'll break if my song is less than 4 or 5 seconds, but if my song is that short I have bigger issues
-            
-            #posInSxx = posInSxx.astype(int)
-            if posInSxx < 99 or posInSxx > (len(sxx[0])-100):
-                try:
-                    emptyBit = np.zeros((501, max(100-posInSxx, 100-len(sxx[0])+posInSxx)))
-                except:
-                    emptyBit = None
-            spectrogramArray = None
-            #This bit just takes the empty bits, and the spectrogram, to get the correct section of it into a variable
-            if not (posInSxx < 99 or posInSxx > len(sxx[0])-100):
-                spectrogramArray = sxx.take([*range(max(0, posInSxx-100), min(len(sxx[0]), posInSxx+100))], axis=1)
-            elif posInSxx < 100:
-                spectrogramArray = np.concatenate((emptyBit, sxx.take([*range(max(0, posInSxx-100), min(len(sxx[0]), posInSxx+100))], axis=1)), axis=1)
-            else:
-                spectrogramArray = np.concatenate((sxx.take([*range(max(0, posInSxx-100),min(len(sxx[0]), posInSxx+100))], axis=1), emptyBit), axis=1)
+            spectrogramArray = getSpectrogram(data.wavFile, data.secondsIn)
             #Zero the gradients
             extractorOptimizer.zero_grad()
             discrimOptimizer.zero_grad()
@@ -136,6 +115,7 @@ while True:
             print("Loss Discrim 1 " + str(loss.item()))
             discriminator.to("cpu")
             discrimOptimizer.step()
+            print(list(discriminator.parameters())[(len(list(discriminator.parameters()))-4):(len(list(discriminator.parameters())))])
             discriminator.to(device)
 
             #This is a somewhat crude but not that bad method for grabbing random data from the dataset - I grab a random number within the data, then iterate until I get to the song that contains it, then I grab it
@@ -149,24 +129,7 @@ while True:
                     data = b.getData(loc)
                     break
 
-            #This whole section is basically the above section - I'll put this in a function soon
-            sr, songData = wavfile.read(data.wavFile)
-            songData = np.mean(songData, axis=1)
-            _, times, sxx = scipy.signal.spectrogram(songData, sr, nperseg=1000)
-            posInSxx = (int(data.secondsIn//(times[1]-times[0]))+1)
-            emptyBit = None
-            if posInSxx < 99 or posInSxx > (len(sxx[0])-100):
-                try:
-                    emptyBit = np.zeros((501, max(100-posInSxx, 100-len(sxx[0])+posInSxx)))
-                except:
-                    emptyBit = None
-            spectrogramArray = None
-            if not (posInSxx < 99 or posInSxx > len(sxx[0])-100):
-                spectrogramArray = sxx.take([*range(max(0, posInSxx-100), min(len(sxx[0]), posInSxx+100))], axis=1)
-            elif posInSxx < 100:
-                spectrogramArray = np.concatenate((emptyBit, sxx.take([*range(max(0, posInSxx-100), min(len(sxx[0]), posInSxx+100))], axis=1)), axis=1)
-            else:
-                spectrogramArray = np.concatenate((sxx.take([*range(max(0, posInSxx-100),min(len(sxx[0]), posInSxx+100))], axis=1), emptyBit), axis=1)
+            spectrogramArray = getSpectrogram(data.wavFile, data.secondsIn)
             #Zero gradients
             extractorOptimizer.zero_grad()
             discrimOptimizer.zero_grad()
@@ -189,6 +152,7 @@ while True:
             discrimOptimizer.zero_grad()
             genOptimizer.zero_grad()
             discrimantorResultForDiscrim = discriminator(generatedData.squeeze(0).detach(), features.detach(), torch.tensor(data.extraSlices).unsqueeze(0).to(device).float())
+            print("discrim Results discrim 2 " + str(discrimantorResultForDiscrim))
             lossForDiscrim = F.cross_entropy(discriminatorGuess.squeeze(0), torch.tensor([0]).to(device))
             print("Loss for discrim 2 " + str(lossForDiscrim.item()))
             lossForDiscrim.backward()
