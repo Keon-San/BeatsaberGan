@@ -67,5 +67,5 @@ class Discriminator(nn.Module):
         x = x.view(-1, 1, 540)
         x = F.relu(self.lin1(x))
         x = F.relu(self.lin2(x))
-        x = F.softmax(self.lin3(x))
+        x = F.softmax(self.lin3(x), dim=2)
         return x

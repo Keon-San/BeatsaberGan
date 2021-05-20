@@ -115,7 +115,7 @@ while True:
             print("Loss Discrim 1 " + str(loss.item()))
             discriminator.to("cpu")
             discrimOptimizer.step()
-            print(list(discriminator.parameters())[(len(list(discriminator.parameters()))-4):(len(list(discriminator.parameters())))])
+            #print(list(discriminator.parameters())[(len(list(discriminator.parameters()))-4):(len(list(discriminator.parameters())))])
             discriminator.to(device)
 
             #This is a somewhat crude but not that bad method for grabbing random data from the dataset - I grab a random number within the data, then iterate until I get to the song that contains it, then I grab it
